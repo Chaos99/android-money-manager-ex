@@ -1,9 +1,22 @@
-package com.money.manager.ex.core;
+/*
+ * Copyright (C) 2012-2015 The Android Money Manager Ex Project Team
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ */
 
-import java.io.File;
-import java.io.FileWriter;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
+package com.money.manager.ex.core;
 
 import android.app.ProgressDialog;
 import android.content.Context;
@@ -13,11 +26,17 @@ import android.os.Environment;
 import android.text.TextUtils;
 import android.util.Log;
 import android.widget.Toast;
-import au.com.bytecode.opencsv.CSVWriter;
 
 import com.money.manager.ex.R;
 import com.money.manager.ex.adapter.AllDataAdapter;
 import com.money.manager.ex.database.QueryAllData;
+
+import java.io.File;
+import java.io.FileWriter;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+
+import au.com.bytecode.opencsv.CSVWriter;
 
 public class ExportToCsvFile extends AsyncTask<Void, Void, Boolean> {
 	private final String LOGCAT = ExportToCsvFile.class.getSimpleName();
@@ -45,17 +64,16 @@ public class ExportToCsvFile extends AsyncTask<Void, Void, Boolean> {
 		try {
 			CSVWriter csvWriter = new CSVWriter(new FileWriter(mFileName), CSVWriter.DEFAULT_SEPARATOR,
 					CSVWriter.NO_QUOTE_CHARACTER);
-			data.moveToFirst();
-			while (!data.isAfterLast()) {
+			while (data.moveToNext()) {
 				String[] record = new String[7];
 				// compose a records
 				record[0] = data.getString(data.getColumnIndex(QueryAllData.UserDate));
 				if (!TextUtils.isEmpty(data.getString(data.getColumnIndex(QueryAllData.Payee)))) {
 					record[1] = data.getString(data.getColumnIndex(QueryAllData.Payee));
 				} else {
-					record[1] = data.getString(data.getColumnIndex(QueryAllData.ToAccountName));
+					record[1] = data.getString(data.getColumnIndex(QueryAllData.AccountName));
 				}
-				record[2] = Double.toString(data.getDouble(data.getColumnIndex(QueryAllData.TOTRANSAMOUNT)));
+				record[2] = Double.toString(data.getDouble(data.getColumnIndex(QueryAllData.Amount)));
 				record[3] = data.getString(data.getColumnIndex(QueryAllData.Category));
 				record[4] = data.getString(data.getColumnIndex(QueryAllData.Subcategory));
 				record[5] = Integer.toString(data.getInt(data.getColumnIndex(QueryAllData.TransactionNumber)));

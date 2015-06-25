@@ -1,26 +1,21 @@
-/*******************************************************************************
- * Copyright (C) 2012 The Android Money Manager Ex Project
- * 
+/*
+ * Copyright (C) 2012-2015 The Android Money Manager Ex Project Team
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ******************************************************************************/
+ */
 package com.money.manager.ex.database;
-
-import java.lang.reflect.Constructor;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map.Entry;
 
 import android.content.ContentValues;
 import android.content.Context;
@@ -32,14 +27,22 @@ import android.util.Log;
 
 import com.money.manager.ex.BuildConfig;
 import com.money.manager.ex.MoneyManagerProvider;
+
+import java.lang.reflect.Constructor;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map.Entry;
 /**
  * 
  * @author Alessandro Lazzari (lazzari.ale@gmail.com)
  * @version 1.0.0
  */
 @SuppressWarnings("unused")
-public abstract class Dataset implements BaseColumns {
+public abstract class Dataset
+		implements BaseColumns {
+
 	private static final String LOGCAT = Dataset.class.getSimpleName();
+
 	// member private of class
 	private String source = "";
 	private DatasetType type;
@@ -55,7 +58,8 @@ public abstract class Dataset implements BaseColumns {
 		this.source = source;
 		this.type = type;
 		this.basepath = basepath;
-	};
+	}
+
 	/**
 	 * The default check in CheckingAccount. If checked to another table use canDelete(Context context, ContentValues values, String className)
 	 * @param context context from call
@@ -79,7 +83,7 @@ public abstract class Dataset implements BaseColumns {
 		}
 		// compose filter
 		String selection = "";
-		List<String> selectionArgs = new ArrayList<String>();
+		List<String> selectionArgs = new ArrayList<>();
 		
 		for(Entry<String, Object> entry : values.valueSet()) {
 			if (!(TextUtils.isEmpty(selection))) {
@@ -92,7 +96,7 @@ public abstract class Dataset implements BaseColumns {
 		@SuppressWarnings("rawtypes")
 		Class[] classParm = null;
 		Object[] objectParm = null;
-		Dataset dataset = null;
+		Dataset dataset;
 		try {
 			Class<?> cls = Class.forName(className);
 			Constructor<?> cnt = cls.getConstructor(classParm);
@@ -107,13 +111,15 @@ public abstract class Dataset implements BaseColumns {
 			return false;
 		}
 		// check if referenced
-		Cursor cursor = context.getContentResolver().query(dataset.getUri(), null, selection, selectionArgs.toArray(new String[selectionArgs.size()]), null);
+		Cursor cursor = context.getContentResolver().query(dataset.getUri(), null,
+				selection, selectionArgs.toArray(new String[selectionArgs.size()]), null);
 		if (cursor != null && cursor.getCount() <= 0) {
+			cursor.close();
 			return true;
 		} else {
 			return false;
 		}
-	};
+	}
 
 	/**
 	 * 
@@ -122,6 +128,7 @@ public abstract class Dataset implements BaseColumns {
 	public String[] getAllColumns() {
 		return new String[] {""};
 	}
+
 	/**
 	 * @return the basepath
 	 */
@@ -134,13 +141,15 @@ public abstract class Dataset implements BaseColumns {
 	public String getSource() {
 		return source;
 	}
+
 	/**
 	 * 
 	 * @return SQL statment
 	 */
 	public String getSQL() {
 		switch (type) {
-		case TABLE: case VIEW:
+		case TABLE:
+		case VIEW:
 			return "SELECT " + getAllColumns() + " FROM " + source;
 		case QUERY:
 			return source;
@@ -148,12 +157,14 @@ public abstract class Dataset implements BaseColumns {
 			return null;
 		}
 	}
+
 	/**
 	 * @return the type
 	 */
 	public DatasetType getType() {
 		return type;
 	}
+
 	/**
 	 * 
 	 * @return the Uri for the content provider
@@ -165,9 +176,13 @@ public abstract class Dataset implements BaseColumns {
 			//che tye of dataset
 			switch (this.type) {
 			case TABLE:
+				// todo: inspect what was the intention here. The result of the operation is ignored.
+
 				parse.concat("tables/");
 				break;
 			case QUERY:
+				// todo: inspect what was the intention here. The result of the operation is ignored.
+
 				parse.concat("queries/");
 				break;
 			default:
@@ -201,9 +216,7 @@ public abstract class Dataset implements BaseColumns {
 	}
 	/**
 	 * Populates the instance of the class to current record the cursor
-	 * @param c
+	 * @param c cursor
 	 */
-	protected void setValueFromCursor(Cursor c) {
-		return;
-	}
+	protected void setValueFromCursor(Cursor c) {	}
 }

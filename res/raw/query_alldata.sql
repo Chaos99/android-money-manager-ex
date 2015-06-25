@@ -2,39 +2,41 @@ SELECT 	CANS.TransID AS ID,
 	CANS.TransCode AS TransactionType,
 	date( CANS.TransDate ) AS Date,
 	d.userdate AS UserDate,
-	coalesce( CAT.CategName, SCAT.CategName ) AS Category,
-	coalesce( SUBCAT.SUBCategName, SSCAT.SUBCategName, '' ) AS Subcategory,
-	ROUND( ( CASE CANS.TRANSCODE WHEN 'Withdrawal' THEN -1 ELSE 1 END ) *  ( CASE CANS.CATEGID WHEN -1 THEN st.splittransamount ELSE CANS.TRANSAMOUNT END) , 2 ) AS Amount,
-	cf.currency_symbol AS currency,
+	CAT.CategName as Category,
+	SUBCAT.SUBCategName as Subcategory,
+	CASE
+	    WHEN CANS.ToTransAmount = 0 THEN ROUND( ( CASE CANS.TRANSCODE WHEN 'Withdrawal' THEN -1 ELSE 1 END ) *  CANS.TransAmount, 2 )
+	    ELSE ROUND( ( CASE CANS.TRANSCODE WHEN 'Withdrawal' THEN -1 ELSE 1 END ) *  CANS.ToTransAmount, 2 )
+	END as Amount,
+	ifnull(cfTo.currency_symbol, cf.currency_symbol) AS currency,
 	CANS.Status AS Status,
 	CANS.NOTES AS Notes,
-	cf.BaseConvRate AS BaseConvRate,
-	FROMACC.CurrencyID AS CurrencyID,
-	FROMACC.AccountName AS AccountName,
-	FROMACC.AccountID AS AccountID,
-	ifnull( TOACC.AccountName, '' ) AS ToAccountName,
-	ifnull( TOACC.ACCOUNTId, -1 ) AS ToAccountID,
-	CANS.ToTransAmount ToTransAmount,
-	ifnull( TOACC.CURRENCYID, -1 ) AS ToCurrencyID,
+	ifnull(cfTo.BaseConvRate, cf.BaseConvRate) AS BaseConvRate,
+	ifnull(ToAcc.CurrencyID, FROMACC.CurrencyID) as CurrencyID,
+	ifnull(ToAcc.AccountName, FROMACC.AccountName) as AccountName,
+	ifnull(ToAcc.AccountID, FROMACC.AccountID) as AccountID,
+	FromAcc.AccountName as FromAccountName,
+	FromAcc.AccountId as FromAccountId,
+	CANS.TransAmount * -1 as FromAmount,
+	FromAcc.CurrencyId as FromCurrencyId,
 	( CASE ifnull( CANS.CATEGID, -1 ) WHEN -1 THEN 1 ELSE 0 END ) AS Splitted,
-	ifnull( CAT.CategId, st.CategId ) AS CategID,
-	ifnull( ifnull( SUBCAT.SubCategID, st.subCategId ) , -1 ) AS SubCategID,
-	ifnull( PAYEE.PayeeName, '' ) AS Payee,
+	ifnull( CAT.CategId, -1 ) AS CategID,
+	ifnull( SUBCAT.SubCategID, -1 ) AS SubCategID,
+	ifnull( PAYEE.PayeeName, '') AS Payee,
 	ifnull( PAYEE.PayeeID, -1 ) AS PayeeID,
 	CANS.TRANSACTIONNUMBER AS TransactionNumber,
 	d.year AS Year,
 	d.month AS Month,
 	d.day AS Day,
 	d.finyear AS FinYear
-FROM 	CHECKINGACCOUNT_V1 CANS LEFT JOIN CATEGORY_V1 CAT ON CAT.CATEGID = CANS.CATEGID
+FROM 	CHECKINGACCOUNT_V1 CANS 
+	LEFT JOIN CATEGORY_V1 CAT ON CAT.CATEGID = CANS.CATEGID
 	LEFT JOIN SUBCATEGORY_V1 SUBCAT ON SUBCAT.SUBCATEGID = CANS.SUBCATEGID AND SUBCAT.CATEGID = CANS.CATEGID
 	LEFT JOIN PAYEE_V1 PAYEE ON PAYEE.PAYEEID = CANS.PAYEEID 
 	LEFT JOIN ACCOUNTLIST_V1 FROMACC ON FROMACC.ACCOUNTID = CANS.ACCOUNTID
 	LEFT JOIN ACCOUNTLIST_V1 TOACC ON TOACC.ACCOUNTID = CANS.TOACCOUNTID
-	LEFT JOIN splittransactions_v1 st ON CANS.transid = st.transid
-	LEFT JOIN CATEGORY_V1 SCAT ON SCAT.CATEGID = st.CATEGID AND CANS.TransId = st.transid
-	LEFT JOIN SUBCATEGORY_V1 SSCAT ON SSCAT.SUBCATEGID = st.SUBCATEGID AND SSCAT.CATEGID = st.CATEGID AND CANS.TransId = st.transid
 	LEFT JOIN currencyformats_v1 cf ON cf.currencyid = FROMACC.currencyid
+	LEFT JOIN currencyformats_v1 cfTo ON cfTo.currencyid = TOACC.currencyid
 	LEFT JOIN  ( 
            SELECT	transid AS id,
 	    	  			date( transdate ) AS transdate,

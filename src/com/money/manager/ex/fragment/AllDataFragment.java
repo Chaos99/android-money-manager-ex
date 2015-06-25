@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2014 Alessandro Lazzari
+ * Copyright (C) 2012-2015 The Android Money Manager Ex Project Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -17,63 +17,56 @@
  */
 package com.money.manager.ex.fragment;
 
-import android.app.AlertDialog;
+import android.app.Activity;
 import android.content.ContentValues;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.database.Cursor;
-import android.os.Build;
 import android.os.Bundle;
+import android.support.v4.app.Fragment;
 import android.support.v4.app.LoaderManager.LoaderCallbacks;
 import android.support.v4.content.CursorLoader;
 import android.support.v4.content.Loader;
 import android.support.v4.widget.CursorAdapter;
+import android.support.v7.app.ActionBar;
 import android.text.TextUtils;
 import android.util.Log;
 import android.util.SparseBooleanArray;
-import android.view.ActionMode;
-import android.view.ContextMenu;
-import android.view.ContextMenu.ContextMenuInfo;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AbsListView.MultiChoiceModeListener;
 import android.widget.AdapterView;
-import android.widget.AdapterView.AdapterContextMenuInfo;
 import android.widget.AdapterView.OnItemClickListener;
+import android.widget.ListAdapter;
 import android.widget.ListView;
 import android.widget.Toast;
 
-import com.actionbarsherlock.view.Menu;
-import com.actionbarsherlock.view.MenuInflater;
-import com.actionbarsherlock.view.MenuItem;
+import com.afollestad.materialdialogs.AlertDialogWrapper;
+import com.afollestad.materialdialogs.MaterialDialog;
 import com.money.manager.ex.CheckingAccountActivity;
-import com.money.manager.ex.Constants;
 import com.money.manager.ex.R;
-import com.money.manager.ex.SearchActivity;
+import com.money.manager.ex.businessobjects.qif.QifExport;
+import com.money.manager.ex.checkingaccount.CheckingAccountConstants;
+import com.money.manager.ex.interfaces.IAllDataFragmentCallbacks;
+import com.money.manager.ex.search.SearchActivity;
 import com.money.manager.ex.adapter.AllDataAdapter;
 import com.money.manager.ex.adapter.AllDataAdapter.TypeCursor;
+import com.money.manager.ex.adapter.DrawerMenuItem;
+import com.money.manager.ex.adapter.DrawerMenuItemAdapter;
+import com.money.manager.ex.core.Core;
 import com.money.manager.ex.core.ExportToCsvFile;
-import com.money.manager.ex.database.MoneyManagerOpenHelper;
 import com.money.manager.ex.database.QueryAllData;
 import com.money.manager.ex.database.TableCheckingAccount;
+import com.money.manager.ex.database.TableSplitTransactions;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 
-public class AllDataFragment extends BaseListFragment implements LoaderCallbacks<Cursor> {
-    // ID Loader
-    public static final int ID_LOADER_ALL_DATA_DETAIL = 1;
-    // KEY Arguments
-    public static final String KEY_ARGUMENTS_WHERE = "SearchResultFragment:ArgumentsWhere";
-    public static final String KEY_ARGUMENTS_SORT = "SearchResultFragment:ArgumentsSort";
-    private static final String LOGCAT = AllDataFragment.class.getSimpleName();
-    private AllDataFragmentLoaderCallbacks mSearResultFragmentLoaderCallbacks;
-    private boolean mAutoStarLoader = true;
-    private boolean mShownHeader = false;
-    private boolean mShownBalance = false;
-    private int mGroupId = 0;
-    private int mAccountId = -1;
-    private AllDataMultiChoiceModeListener mMultiChoiceModeListener;
+public class AllDataFragment extends BaseListFragment
+        implements LoaderCallbacks<Cursor>, IAllDataMultiChoiceModeListenerCallbacks {
 
     /**
      * Create a new instance of AllDataFragment with accountId params
@@ -81,10 +74,108 @@ public class AllDataFragment extends BaseListFragment implements LoaderCallbacks
      * @param accountId Id of account to display. If generic shown set -1
      * @return new instance AllDataFragment
      */
-    public static AllDataFragment newInstance(int accountId) {
+    public static AllDataFragment newInstance(int accountId, IAllDataFragmentCallbacks callbacks) {
         AllDataFragment fragment = new AllDataFragment();
-        fragment.mAccountId = accountId;
+        fragment.AccountId = accountId;
+        fragment.mCallbacks = callbacks;
+
         return fragment;
+    }
+
+    // ID Loader
+    public static final int ID_LOADER_ALL_DATA_DETAIL = 1;
+    // KEY Arguments
+    public static final String KEY_ARGUMENTS_WHERE = "SearchResultFragment:ArgumentsWhere";
+    public static final String KEY_ARGUMENTS_WHERE_PARAMS = "SearchResultFragment:ArgumentsWhereParams";
+    public static final String KEY_ARGUMENTS_SORT = "SearchResultFragment:ArgumentsSort";
+
+    public int AccountId = -1;
+
+    private static final String LOGCAT = AllDataFragment.class.getSimpleName();
+
+    private IAllDataFragmentLoaderCallbacks mSearResultFragmentLoaderCallbacks;
+    private boolean mAutoStarLoader = true;
+    private boolean mShownHeader = false;
+    private boolean mShownBalance = false;
+    private AllDataMultiChoiceModeListener mMultiChoiceModeListener;
+    private View mListHeader = null;
+
+    private IAllDataFragmentCallbacks mCallbacks;
+    private Bundle mArguments;
+
+    @Override
+    public void onActivityCreated(Bundle savedInstanceState) {
+        super.onActivityCreated(savedInstanceState);
+
+        // set fragment
+        setEmptyText(getString(R.string.no_data));
+        setListShown(false);
+
+        // Read header indicator directly from the activity.
+        if (getActivity() instanceof SearchActivity) {
+            SearchActivity activity = (SearchActivity) getActivity();
+            setShownHeader(activity.ShowAccountHeaders);
+        }
+
+        // create adapter
+        AllDataAdapter adapter = new AllDataAdapter(getActivity(), null, TypeCursor.ALLDATA);
+        adapter.setAccountId(this.AccountId);
+        adapter.setShowAccountName(isShownHeader());
+        adapter.setShowBalanceAmount(isShownBalance());
+
+        // set choice mode in list view
+        mMultiChoiceModeListener = new AllDataMultiChoiceModeListener();
+        mMultiChoiceModeListener.setListener(this);
+        getListView().setChoiceMode(ListView.CHOICE_MODE_MULTIPLE_MODAL);
+        getListView().setMultiChoiceModeListener(mMultiChoiceModeListener);
+
+        // click item
+        getListView().setOnItemClickListener(new OnItemClickListener() {
+
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                if (getListAdapter() != null && getListAdapter() instanceof AllDataAdapter) {
+                    Cursor cursor = ((AllDataAdapter) getListAdapter()).getCursor();
+                    if (cursor.moveToPosition(position - (mListHeader != null ? 1 : 0))) {
+                        startCheckingAccountActivity(cursor.getInt(cursor.getColumnIndex(QueryAllData.ID)));
+                    }
+                }
+            }
+        });
+        // if header is not null add to list view
+        if (getListAdapter() == null) {
+            if (mListHeader != null)
+                getListView().addHeaderView(mListHeader);
+        }
+        // set adapter
+        setListAdapter(adapter);
+
+        // register context menu
+        registerForContextMenu(getListView());
+
+        // set animation progress
+        setListShown(false);
+
+        // floating action button
+        setFloatingActionButtonVisible(true);
+        setFloatingActionButtonAttachListView(true);
+
+        // start loader
+        if (isAutoStarLoader()) {
+            loadData();
+        }
+    }
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        setHasOptionsMenu(true);
+    }
+
+    @Override
+    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+        return super.onCreateView(inflater, container, savedInstanceState);
     }
 
     /**
@@ -97,7 +188,7 @@ public class AllDataFragment extends BaseListFragment implements LoaderCallbacks
     /**
      * Export data to CSV file
      *
-     * @param accountName
+     * @param prefixName prefix for the file
      */
     public void exportDataToCSVFile(String prefixName) {
         ExportToCsvFile csv = new ExportToCsvFile(getActivity(), (AllDataAdapter) getListAdapter());
@@ -106,31 +197,17 @@ public class AllDataFragment extends BaseListFragment implements LoaderCallbacks
     }
 
     /**
-     * @return the mGroupId
-     */
-    public int getContextMenuGroupId() {
-        return mGroupId;
-    }
-
-    /**
-     * @param mGroupId the mGroupId to set
-     */
-    public void setContextMenuGroupId(int mGroupId) {
-        this.mGroupId = mGroupId;
-    }
-
-    /**
      * @return the mSearResultFragmentLoaderCallbacks
      */
-    public AllDataFragmentLoaderCallbacks getSearResultFragmentLoaderCallbacks() {
+    public IAllDataFragmentLoaderCallbacks getSearchResultFragmentLoaderCallbacks() {
         return mSearResultFragmentLoaderCallbacks;
     }
 
     /**
-     * @param mSearResultFragmentLoaderCallbacks the mSearResultFragmentLoaderCallbacks to set
+     * @param searResultFragmentLoaderCallbacks the searResultFragmentLoaderCallbacks to set
      */
-    public void setSearResultFragmentLoaderCallbacks(AllDataFragmentLoaderCallbacks mSearResultFragmentLoaderCallbacks) {
-        this.mSearResultFragmentLoaderCallbacks = mSearResultFragmentLoaderCallbacks;
+    public void setSearResultFragmentLoaderCallbacks(IAllDataFragmentLoaderCallbacks searResultFragmentLoaderCallbacks) {
+        this.mSearResultFragmentLoaderCallbacks = searResultFragmentLoaderCallbacks;
     }
 
     /**
@@ -161,132 +238,39 @@ public class AllDataFragment extends BaseListFragment implements LoaderCallbacks
         this.mShownHeader = mShownHeader;
     }
 
-    @Override
-    public void onActivityCreated(Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
-        // set fragment
-        setEmptyText(getString(R.string.no_data));
-        setListShown(false);
-        // option menu
-        setHasOptionsMenu(Build.VERSION.SDK_INT < Build.VERSION_CODES.HONEYCOMB);
-        // create adapter
-        AllDataAdapter adapter = new AllDataAdapter(getActivity(), null, TypeCursor.ALLDATA);
-        adapter.setAccountId(mAccountId);
-        adapter.setShowAccountName(isShownHeader());
-        adapter.setShowBalanceAmount(isShownBalance());
-        if (isShownBalance()) {
-            adapter.setDatabase(new MoneyManagerOpenHelper(getActivity()).getReadableDatabase());
-        }
-        // set choice mode in listview
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
-            mMultiChoiceModeListener = new AllDataMultiChoiceModeListener();
-            getListView().setChoiceMode(ListView.CHOICE_MODE_MULTIPLE_MODAL);
-            getListView().setMultiChoiceModeListener(mMultiChoiceModeListener);
-        }
-        // click item
-        getListView().setOnItemClickListener(new OnItemClickListener() {
+    // Loader event handlers
 
-            @Override
-            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                if (getListAdapter() != null && getListAdapter() instanceof AllDataAdapter) {
-                    Cursor cursor = ((AllDataAdapter) getListAdapter()).getCursor();
-                    if (cursor.moveToPosition(position)) {
-                        startCheckingAccountActivity(cursor.getInt(cursor.getColumnIndex(QueryAllData.ID)));
-                    }
-                }
-            }
-        });
-        // set adapter
-        setListAdapter(adapter);
-        // register context menu
-        registerForContextMenu(getListView());
-        // set divider
-        /*Core core = new Core(getSherlockActivity());
-		if (core.getThemeApplication() == R.style.Theme_Money_Manager_Light_DarkActionBar)
-			getListView().setDivider(new ColorDrawable(new Core(getSherlockActivity()).resolveIdAttribute(R.attr.theme_background_color)));*/
-        //getListView().setSelector(new ColorDrawable(getResources().getColor(R.color.money_background)));
-        // set animation
-        setListShown(false);
-        // start loader
-        if (isAutoStarLoader()) {
-            startLoaderData();
-        }
+    /**
+     * Start loader into fragment
+     */
+    public void loadData() {
+        loadData(getLatestArguments());
     }
 
-    @Override
-    public boolean onContextItemSelected(android.view.MenuItem item) {
-        //if (item.getGroupId() == getContextMenuGroupId())
-        // take a info of the selected menu, and cursor at position
-        AdapterContextMenuInfo info = (AdapterContextMenuInfo) item.getMenuInfo();
-        Cursor cursor = (Cursor) getListAdapter().getItem(info.position);
-        // check if cursor is valid
-        if (cursor != null) {
-            switch (item.getItemId()) {
-                case R.id.menu_delete:
-                    showDialogDeleteCheckingAccount(new int[]{cursor.getInt(cursor.getColumnIndex(QueryAllData.ID))});
-                    return true;
-                case R.id.menu_none:
-                case R.id.menu_reconciled:
-                case R.id.menu_follow_up:
-                case R.id.menu_duplicate:
-                case R.id.menu_void:
-                    String status = Character.toString(item.getAlphabeticShortcut());
-                    if (setStatusCheckingAccount(cursor.getInt(cursor.getColumnIndex(QueryAllData.ID)), status)) {
-                        startLoaderData();
-                        return true;
-                    }
-            }
+    public void loadData(Bundle arguments) {
+        // set the account id in the data adapter
+        AllDataAdapter adapter = (AllDataAdapter) getListAdapter();
+        if (adapter != null) {
+            adapter.setAccountId(this.AccountId);
         }
-        return false;
-    }
 
-    @Override
-    public void onCreateContextMenu(ContextMenu menu, View v, ContextMenuInfo menuInfo) {
-        // take info and cursor from listview adapter
-        AdapterContextMenuInfo info = (AdapterContextMenuInfo) menuInfo;
-        Cursor cursor = (Cursor) getListAdapter().getItem(info.position);
-        // check if cursor is valid
-        if (cursor == null)
-            return;
-		/* getActivity().getMenuInflater().inflate(R.menu.contextmenu_accountfragment, menu);
-		// add manually
-		int[] menuItem = new int[] { R.id.menu_edit, R.id.menu_delete, R.id.menu_reconciled, R.id.menu_none, R.id.menu_follow_up, R.id.menu_duplicate,
-				R.id.menu_void };
-		int[] menuText = new int[] { R.string.edit, R.string.delete, R.string.status_reconciled, R.string.status_none, R.string.status_follow_up,
-				R.string.status_duplicate, R.string.status_void };
-		for (int i = 0; i < menuItem.length; i++) {
-			menu.add(getContextMenuGroupId(), menuItem[i], i, menuText[i]);
-		} */
-        // create a context menu
-        getSherlockActivity().getMenuInflater().inflate(R.menu.menu_all_data_adapter, menu);
-        menu.setHeaderTitle(cursor.getString(cursor.getColumnIndex(QueryAllData.AccountName)));
-        // hide current status
-        if (menu.findItem(R.id.menu_reconciled) != null)
-            menu.findItem(R.id.menu_reconciled).setVisible(!Constants.TRANSACTION_STATUS_RECONCILED.equalsIgnoreCase(cursor.getString(cursor.getColumnIndex(QueryAllData.Status))));
-        if (menu.findItem(R.id.menu_none) != null)
-            menu.findItem(R.id.menu_none).setVisible(!Constants.TRANSACTION_STATUS_UNRECONCILED.equalsIgnoreCase(cursor.getString(cursor.getColumnIndex(QueryAllData.Status))));
-        if (menu.findItem(R.id.menu_duplicate) != null)
-            menu.findItem(R.id.menu_duplicate).setVisible(!Constants.TRANSACTION_STATUS_DUPLICATE.equalsIgnoreCase(cursor.getString(cursor.getColumnIndex(QueryAllData.Status))));
-        if (menu.findItem(R.id.menu_follow_up) != null)
-            menu.findItem(R.id.menu_follow_up).setVisible(!Constants.TRANSACTION_STATUS_FOLLOWUP.equalsIgnoreCase(cursor.getString(cursor.getColumnIndex(QueryAllData.Status))));
-        if (menu.findItem(R.id.menu_void) != null)
-            menu.findItem(R.id.menu_void).setVisible(!Constants.TRANSACTION_STATUS_VOID.equalsIgnoreCase(cursor.getString(cursor.getColumnIndex(QueryAllData.Status))));
-
+        // set the current arguments / account id
+        setLatestArguments(arguments);
+        // reload data with the latest arguments.
+        getLoaderManager().restartLoader(ID_LOADER_ALL_DATA_DETAIL, arguments, this);
     }
 
     @Override
     public Loader<Cursor> onCreateLoader(int id, Bundle args) {
-        if (getSearResultFragmentLoaderCallbacks() != null)
-            getSearResultFragmentLoaderCallbacks().onCallbackCreateLoader(id, args);
+        if (getSearchResultFragmentLoaderCallbacks() != null)
+            getSearchResultFragmentLoaderCallbacks().onCallbackCreateLoader(id, args);
         //animation
         setListShown(false);
 
         switch (id) {
             case ID_LOADER_ALL_DATA_DETAIL:
-                QueryAllData allData = new QueryAllData(getActivity());
                 // compose selection and sort
-                String selection = "",
-                        sort = "";
+                String selection = "", sort = "";
                 if (args != null && args.containsKey(KEY_ARGUMENTS_WHERE)) {
                     ArrayList<String> whereClause = args.getStringArrayList(KEY_ARGUMENTS_WHERE);
                     if (whereClause != null) {
@@ -295,30 +279,111 @@ public class AllDataFragment extends BaseListFragment implements LoaderCallbacks
                         }
                     }
                 }
+                // where parameters
+                String[] whereParams = new String[0];
+                if (args != null && args.containsKey(KEY_ARGUMENTS_WHERE_PARAMS)) {
+                    ArrayList<String> whereParamsList = args.getStringArrayList(KEY_ARGUMENTS_WHERE_PARAMS);
+                    whereParams = whereParamsList.toArray(whereParams);
+                }
                 // set sort
                 if (args != null && args.containsKey(KEY_ARGUMENTS_SORT)) {
                     sort = args.getString(KEY_ARGUMENTS_SORT);
                 }
                 // create loader
-                return new CursorLoader(getActivity(), allData.getUri(), allData.getAllColumns(), selection, null, sort);
+                QueryAllData allData = new QueryAllData(getActivity());
+                return new CursorLoader(getActivity(), allData.getUri(),
+                        allData.getAllColumns(),
+                        selection,
+                        whereParams,
+                        sort);
         }
         return null;
     }
 
     @Override
-    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
-        super.onCreateOptionsMenu(menu, inflater);
-        if (getSherlockActivity() != null) {
-            MenuItem itemExportToCsv = menu.findItem(R.id.menu_export_to_csv);
-            if (itemExportToCsv != null) itemExportToCsv.setVisible(true);
-            MenuItem itemSearch = menu.findItem(R.id.menu_search_transaction);
-            if (itemSearch != null) itemSearch.setVisible(!getSherlockActivity().getClass().getSimpleName().equals(SearchActivity.class.getSimpleName()));
-        }
+    public void onLoaderReset(Loader<Cursor> loader) {
+        IAllDataFragmentLoaderCallbacks parent = getSearchResultFragmentLoaderCallbacks();
+        if (parent != null) parent.onCallbackLoaderReset(loader);
+
+        ((CursorAdapter) getListAdapter()).swapCursor(null);
     }
 
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        return super.onCreateView(inflater, container, savedInstanceState);
+    public void onLoadFinished(Loader<Cursor> loader, Cursor data) {
+        IAllDataFragmentLoaderCallbacks parent = getSearchResultFragmentLoaderCallbacks();
+        if (parent != null) parent.onCallbackLoaderFinished(loader, data);
+
+        switch (loader.getId()) {
+            case ID_LOADER_ALL_DATA_DETAIL:
+                AllDataAdapter adapter = (AllDataAdapter) getListAdapter();
+//                if (isShownBalance()) {
+//                    Context appContext = getActivity().getApplicationContext();
+//                    adapter.setDatabase(MoneyManagerOpenHelper.getInstance(appContext).getReadableDatabase());
+//                }
+                adapter.swapCursor(data);
+                if (isResumed()) {
+                    setListShown(true);
+                    if (data.getCount() <= 0 && getFloatingActionButton() != null)
+                        getFloatingActionButton().show(true);
+                } else {
+                    setListShownNoAnimation(true);
+                }
+
+                // reset the transaction groups (account name collection)
+                adapter.resetAccountHeaderIndexes();
+        }
+    }
+
+    // End loader event handlers
+
+    /**
+     * Add options to the action bar of the host activity.
+     * This is not called in ActionBar Activity, i.e. Search.
+     * @param menu
+     * @param inflater
+     */
+    @Override
+    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+        super.onCreateOptionsMenu(menu, inflater);
+
+        Activity activity = getActivity();
+        if (activity == null) return;
+
+        MenuItem itemExportToCsv = menu.findItem(R.id.menu_export_to_csv);
+        if (itemExportToCsv != null) itemExportToCsv.setVisible(true);
+        MenuItem itemSearch = menu.findItem(R.id.menu_search_transaction);
+        if (itemSearch != null) {
+            itemSearch.setVisible(!activity.getClass().getSimpleName()
+                    .equals(SearchActivity.class.getSimpleName()));
+        }
+
+        // show this on all transactions lists later?
+        // show this menu only when on Search Activity for now.
+        if (activity.getClass().getSimpleName().equals(SearchActivity.class.getSimpleName())) {
+            // Add default menu options. todo: check why this is executed twice.
+            // Includes menu item for .qif export
+            MenuItem qifExport = menu.findItem(R.id.menu_qif_export);
+            if (qifExport == null) {
+                inflater.inflate(R.menu.menu_alldata_operations, menu);
+            }
+        }
+    }
+
+    // This is just to test:
+    // http://stackoverflow.com/questions/15207305/getting-the-error-java-lang-illegalstateexception-activity-has-been-destroyed
+    @Override
+    public void onDetach() {
+        super.onDetach();
+        try {
+            Field childFragmentManager = Fragment.class.getDeclaredField("mChildFragmentManager");
+            childFragmentManager.setAccessible(true);
+            childFragmentManager.set(this, null);
+
+        } catch (NoSuchFieldException e) {
+            throw new RuntimeException(e);
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
@@ -329,35 +394,25 @@ public class AllDataFragment extends BaseListFragment implements LoaderCallbacks
     }
 
     @Override
-    public void onLoaderReset(Loader<Cursor> loader) {
-        if (getSearResultFragmentLoaderCallbacks() != null)
-            getSearResultFragmentLoaderCallbacks().onCallbackLoaderReset(loader);
+    public void onResume() {
+        super.onResume();
 
-        ((CursorAdapter) getListAdapter()).swapCursor(null);
-    }
-
-    @Override
-    public void onLoadFinished(Loader<Cursor> loader, Cursor data) {
-        if (getSearResultFragmentLoaderCallbacks() != null) {
-            getSearResultFragmentLoaderCallbacks().onCallbackLoaderFinished(loader, data);
-        }
-        switch (loader.getId()) {
-            case ID_LOADER_ALL_DATA_DETAIL:
-                ((CursorAdapter) getListAdapter()).swapCursor(data);
-                if (isResumed()) {
-                    setListShown(true);
-                } else {
-                    setListShownNoAnimation(true);
-                }
-        }
     }
 
     @Override
     public void onStop() {
         super.onStop();
         try {
-            if (getSherlockActivity().getSupportActionBar().getCustomView() != null)
-                getSherlockActivity().getSupportActionBar().setCustomView(null);
+            BaseFragmentActivity activity = (BaseFragmentActivity) getActivity();
+            if (activity != null) {
+                ActionBar actionBar = activity.getSupportActionBar();
+                if(actionBar != null) {
+                    View customView = actionBar.getCustomView();
+                    if (customView != null) {
+                        actionBar.setCustomView(null);
+                    }
+                }
+            }
         } catch (Exception e) {
             Log.e(LOGCAT, e.getMessage());
         }
@@ -365,23 +420,18 @@ public class AllDataFragment extends BaseListFragment implements LoaderCallbacks
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == R.id.menu_export_to_csv) {
+        int itemId = item.getItemId();
+
+        if (itemId == R.id.menu_export_to_csv) {
             exportDataToCSVFile();
             return true;
         }
-        return super.onOptionsItemSelected(item);
-    }
-
-    private int[] convertArraryListToArray(ArrayList<Integer> list) {
-        int[] ret = new int[list.size()];
-        for (int i = 0; i < list.size(); i++) {
-            ret[i] = list.get(i);
+        if (itemId == R.id.menu_qif_export) {
+            // export visible transactions.
+            exportToQif();
         }
-        return ret;
-    }
 
-    private boolean setStatusCheckingAccount(int transId, String status) {
-        return setStatusCheckingAccount(new int[]{transId}, status);
+        return super.onOptionsItemSelected(item);
     }
 
     private boolean setStatusCheckingAccount(int[] transId, String status) {
@@ -396,7 +446,10 @@ public class AllDataFragment extends BaseListFragment implements LoaderCallbacks
             values.put(TableCheckingAccount.STATUS, status.toUpperCase());
 
             // update
-            if (getActivity().getContentResolver().update(new TableCheckingAccount().getUri(), values, TableCheckingAccount.TRANSID + "=?", new String[]{Integer.toString(id)}) <= 0) {
+            if (getActivity().getContentResolver().update(new TableCheckingAccount().getUri(),
+                    values,
+                    TableCheckingAccount.TRANSID + "=?",
+                    new String[]{Integer.toString(id)}) <= 0) {
                 Toast.makeText(getActivity(), R.string.db_update_failed, Toast.LENGTH_LONG).show();
                 return false;
             }
@@ -405,29 +458,54 @@ public class AllDataFragment extends BaseListFragment implements LoaderCallbacks
     }
 
     /**
-     * @param transId primary key of transation
+     * @param transactionIds primary key of transation
      */
-    private void showDialogDeleteCheckingAccount(final int[] transId) {
+    private void showDialogDeleteCheckingAccount(final ArrayList<Integer> transactionIds) {
         // create alert dialog and set title and message
-        AlertDialog.Builder alertDialog = new AlertDialog.Builder(getActivity());
+        AlertDialogWrapper.Builder alertDialog = new AlertDialogWrapper.Builder(getActivity());
 
         alertDialog.setTitle(R.string.delete_transaction);
-        alertDialog.setMessage(getResources().getQuantityString(R.plurals.plurals_delete_transactions, transId.length, transId.length));
+        alertDialog.setMessage(getResources().getQuantityString(R.plurals.plurals_delete_transactions,
+                transactionIds.size(), transactionIds.size()));
         alertDialog.setIcon(R.drawable.ic_action_warning_light);
 
         // set listener button positive
         alertDialog.setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
-                for (int i = 0; i < transId.length; i++) {
+                for (int transactionId : transactionIds) {
+                    // First delete any splits.
+                    // See if there are any split records.
+                    TableSplitTransactions split = new TableSplitTransactions();
+                    Cursor curSplit = getActivity().getContentResolver().query(split.getUri(), null,
+                            TableSplitTransactions.TRANSID + "=" + Integer.toString(transactionId),
+                            null, TableSplitTransactions.SPLITTRANSID);
+                    int splitCount = curSplit.getCount();
+                    curSplit.close();
+
+                    if (splitCount > 0) {
+                        TableSplitTransactions splits = new TableSplitTransactions();
+                        int deleteResult = getActivity().getContentResolver().delete(splits.getUri(),
+                                TableSplitTransactions.TRANSID + "=?",
+                                new String[]{Integer.toString(transactionId)});
+                        if (deleteResult != splitCount) {
+                            Toast.makeText(getActivity(), R.string.db_delete_failed, Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                    }
+
+                    // Delete the transaction.
+
                     TableCheckingAccount trans = new TableCheckingAccount();
-                    if (getActivity().getContentResolver().delete(trans.getUri(), TableCheckingAccount.TRANSID + "=?", new String[]{Integer.toString(transId[i])}) == 0) {
+                    if (getActivity().getContentResolver().delete(
+                            trans.getUri(), TableCheckingAccount.TRANSID + "=?",
+                            new String[]{Integer.toString(transactionId)}) == 0) {
                         Toast.makeText(getActivity(), R.string.db_delete_failed, Toast.LENGTH_SHORT).show();
                         return;
                     }
                 }
                 // restart loader
-                startLoaderData();
+                loadData();
             }
         });
         // set listener negative button
@@ -453,21 +531,14 @@ public class AllDataFragment extends BaseListFragment implements LoaderCallbacks
         Intent intent = new Intent(getActivity(), CheckingAccountActivity.class);
         // check transId not null
         if (transId != null) {
-            intent.putExtra(CheckingAccountActivity.KEY_TRANS_ID, transId);
+            intent.putExtra(CheckingAccountConstants.KEY_TRANS_ID, transId);
             intent.setAction(Intent.ACTION_EDIT);
         } else {
+            intent.putExtra(CheckingAccountConstants.KEY_ACCOUNT_ID, this.AccountId);
             intent.setAction(Intent.ACTION_INSERT);
         }
         // launch activity
         startActivity(intent);
-    }
-
-    /**
-     * Start loader into fragment
-     */
-    public void startLoaderData() {
-        if (isAdded())
-            getLoaderManager().restartLoader(ID_LOADER_ALL_DATA_DETAIL, getArguments(), this);
     }
 
     /**
@@ -489,82 +560,235 @@ public class AllDataFragment extends BaseListFragment implements LoaderCallbacks
         return null;
     }
 
-    // Interface for callback fragment
-    public interface AllDataFragmentLoaderCallbacks {
-        public void onCallbackCreateLoader(int id, Bundle args);
-
-        public void onCallbackLoaderFinished(Loader<Cursor> loader, Cursor data);
-
-        public void onCallbackLoaderReset(Loader<Cursor> loader);
+    @Override
+    public void onFloatingActionButtonClickListener() {
+        startCheckingAccountActivity(null);
     }
 
-    // class to manage multi choice mode
-    public class AllDataMultiChoiceModeListener implements MultiChoiceModeListener {
+    public View getListHeader() {
+        return mListHeader;
+    }
 
-        @Override
-        public boolean onPrepareActionMode(ActionMode mode, android.view.Menu menu) {
-            // TODO Auto-generated method stub
-            return false;
+    public void setListHeader(View mHeaderList) {
+        this.mListHeader = mHeaderList;
+    }
+
+    // Begin multi-choice-mode listener callback handlers.
+
+    /**
+     * handler for multi-choice-mode listener
+     */
+    @Override
+    public void onMultiChoiceCreated(android.view.Menu menu) {
+//        int selectedItemPosition = getListView().getSelectedItemPosition();
+        getActivity().getMenuInflater().inflate(R.menu.menu_all_data_adapter, menu);
+    }
+
+    @Override
+    public void onDestroyActionMode() {
+        if (getListAdapter() != null && getListAdapter() instanceof AllDataAdapter) {
+            AllDataAdapter adapter = (AllDataAdapter) getListAdapter();
+            adapter.clearPositionChecked();
+            adapter.notifyDataSetChanged();
+        }
+    }
+
+    @Override
+    public void onDeleteClicked() {
+        ArrayList<Integer> transIds = getTransactionIds();
+
+        showDialogDeleteCheckingAccount(transIds);
+    }
+
+    @Override
+    public void onChangeTransactionStatusClicked() {
+        ArrayList<Integer> transIds = getTransactionIds();
+        changeTransactionStatus(transIds);
+    }
+
+    @Override
+    public void onTransactionStatusClicked(String status) {
+        ArrayList<Integer> transIds = getTransactionIds();
+
+        if (setStatusCheckingAccount(convertArrayListToArray(transIds), status)) {
+            ((AllDataAdapter) getListAdapter()).clearPositionChecked();
+            loadData();
+        }
+    }
+
+    @Override
+    public void onSelectAllRecordsClicked() {
+        selectAllRecords();
+    }
+
+    @Override
+    public void onDuplicateTransactionsClicked() {
+        ArrayList<Integer> transIds = getTransactionIds();
+        showDuplicateTransactionView(transIds);
+    }
+
+    @Override
+    public void onItemCheckedStateChanged(int position, boolean checked) {
+        if (getListHeader() != null) {
+            position--;
         }
 
-        @Override
-        public void onDestroyActionMode(ActionMode mode) {
-            if (getListAdapter() != null && getListAdapter() instanceof AllDataAdapter) {
-                AllDataAdapter adapter = (AllDataAdapter) getListAdapter();
-                adapter.clearPositionChecked();
-                adapter.notifyDataSetChanged();
+        if (getListAdapter() != null && getListAdapter() instanceof AllDataAdapter) {
+            AllDataAdapter adapter = (AllDataAdapter) getListAdapter();
+            adapter.setPositionChecked(position, checked);
+            adapter.notifyDataSetChanged();
+        }
+    }
+
+    // Private area
+
+    private void selectAllRecords() {
+        ListAdapter listAdapter = getListAdapter();
+        if (listAdapter != null && listAdapter instanceof AllDataAdapter) {
+            AllDataAdapter adapter = (AllDataAdapter) getListAdapter();
+
+            // Clear selection first.
+            adapter.clearPositionChecked();
+
+            int numRecords = adapter.getCount();
+            for (int i = 0; i < numRecords; i++) {
+                adapter.setPositionChecked(i, true);
             }
-        }
 
-        @Override
-        public boolean onCreateActionMode(ActionMode mode, android.view.Menu menu) {
-            getSherlockActivity().getMenuInflater().inflate(R.menu.menu_all_data_adapter, menu);
-            return true;
+            adapter.notifyDataSetChanged();
         }
+    }
 
-        @Override
-        public boolean onActionItemClicked(ActionMode mode, android.view.MenuItem item) {
-            ArrayList<Integer> transIds = new ArrayList<Integer>();
-            if (getListAdapter() != null && getListAdapter() instanceof AllDataAdapter) {
-                AllDataAdapter adapter = (AllDataAdapter) getListAdapter();
-                Cursor cursor = adapter.getCursor();
-                if (cursor != null) {
-                    SparseBooleanArray positionChecked = getListView().getCheckedItemPositions();
-                    for (int i = 0; i < getListView().getCheckedItemCount(); i++) {
-                        int position = positionChecked.keyAt(i);
-                        if (cursor.moveToPosition(position)) {
-                            transIds.add(cursor.getInt(cursor.getColumnIndex(QueryAllData.ID)));
-                        }
+    private ArrayList<Integer> getTransactionIds(){
+        final ArrayList<Integer> transIds = new ArrayList<>();
+
+        if (getListAdapter() != null && getListAdapter() instanceof AllDataAdapter) {
+            AllDataAdapter adapter = (AllDataAdapter) getListAdapter();
+            Cursor cursor = adapter.getCursor();
+            if (cursor != null) {
+                // get checked items & count from the adapter, not from the list view.
+                // List view only contains the one that was tapped, ignoring the Select All.
+//                SparseBooleanArray positionChecked = getListView().getCheckedItemPositions();
+                SparseBooleanArray positionChecked = adapter.getPositionsChecked();
+//                int checkedItemsCount = getListView().getCheckedItemCount();
+                int checkedItemsCount = positionChecked.size();
+
+                for (int i = 0; i < checkedItemsCount; i++) {
+                    int position = positionChecked.keyAt(i);
+                    // This screws up the selection?
+//                    if (getListHeader() != null)
+//                        position--;
+                    if (cursor.moveToPosition(position)) {
+                        transIds.add(cursor.getInt(cursor.getColumnIndex(QueryAllData.ID)));
                     }
                 }
             }
-            switch (item.getItemId()) {
-                case R.id.menu_delete:
-                    showDialogDeleteCheckingAccount(convertArraryListToArray(transIds));
-                    return true;
-                case R.id.menu_none:
-                case R.id.menu_reconciled:
-                case R.id.menu_follow_up:
-                case R.id.menu_duplicate:
-                case R.id.menu_void:
-                    String status = Character.toString(item.getAlphabeticShortcut());
-                    if (setStatusCheckingAccount(convertArraryListToArray(transIds), status)) {
-                        ((AllDataAdapter) getListAdapter()).clearPositionChecked();
-                        startLoaderData();
-                        mode.finish();
-                        return true;
-                    }
-            }
-            return false;
         }
 
-        @Override
-        public void onItemCheckedStateChanged(ActionMode mode, int position, long id, boolean checked) {
-            if (getListAdapter() != null && getListAdapter() instanceof AllDataAdapter) {
-                AllDataAdapter adapter = (AllDataAdapter) getListAdapter();
-                adapter.setPositionChecked(position, checked);
-                adapter.notifyDataSetChanged();
+        return transIds;
+    }
+
+    private void changeTransactionStatus(final ArrayList<Integer> transIds){
+        final DrawerMenuItemAdapter adapter = new DrawerMenuItemAdapter(getActivity());
+        final Core core = new Core(getActivity().getApplicationContext());
+        final Boolean isDarkTheme = core.getThemeApplication() == R.style.Theme_Money_Manager;
+        // add status
+        adapter.add(new DrawerMenuItem().withId(R.id.menu_none)
+                .withText(getString(R.string.status_none))
+                .withIcon(isDarkTheme ? R.drawable.ic_action_help_dark : R.drawable.ic_action_help_light)
+                .withShortcut(""));
+        adapter.add(new DrawerMenuItem().withId(R.id.menu_reconciled)
+                .withText(getString(R.string.status_reconciled))
+                .withIcon(isDarkTheme ? R.drawable.ic_action_done_dark : R.drawable.ic_action_done_light)
+                .withShortcut("R"));
+        adapter.add(new DrawerMenuItem().withId(R.id.menu_follow_up)
+                .withText(getString(R.string.status_follow_up))
+                .withIcon(isDarkTheme ? R.drawable.ic_action_alarm_on_dark : R.drawable.ic_action_alarm_on_light)
+                .withShortcut("F"));
+        adapter.add(new DrawerMenuItem().withId(R.id.menu_duplicate)
+                .withText(getString(R.string.status_duplicate))
+                .withIcon(isDarkTheme ? R.drawable.ic_action_copy_dark : R.drawable.ic_action_copy_light)
+                .withShortcut("D"));
+        adapter.add(new DrawerMenuItem().withId(R.id.menu_void)
+                .withText(getString(R.string.status_void))
+                .withIcon(isDarkTheme ? R.drawable.ic_action_halt_dark : R.drawable.ic_action_halt_light)
+                .withShortcut("V"));
+
+        // open dialog
+        final MaterialDialog dialog = new MaterialDialog.Builder(getActivity())
+                .title(getString(R.string.change_status))
+                .adapter(adapter, null)
+                .build();
+
+        ListView listView = dialog.getListView();
+        if (listView != null) listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                DrawerMenuItem item = adapter.getItem(position);
+                switch (item.getId()) {
+                    case R.id.menu_none:
+                    case R.id.menu_reconciled:
+                    case R.id.menu_follow_up:
+                    case R.id.menu_duplicate:
+                    case R.id.menu_void:
+                        String status = item.getShortcut();
+                        if (setStatusCheckingAccount(convertArrayListToArray(transIds), status)) {
+                            ((AllDataAdapter) getListAdapter()).clearPositionChecked();
+                            loadData();
+                        }
+                }
+                dialog.dismiss();
             }
+        });
+        dialog.show();
+    }
+
+    private void showDuplicateTransactionView(ArrayList<Integer> transIds) {
+        // validation
+        int transactionCount = transIds.size();
+        if (transactionCount <= 0) return;
+
+        int[] ids = convertArrayListToArray(transIds);
+        Intent[] intents = new Intent[transactionCount];
+        for (int i = 0; i < transactionCount; i++) {
+            intents[i] = new Intent(getActivity(), CheckingAccountActivity.class);
+            intents[i].putExtra(CheckingAccountConstants.KEY_TRANS_ID, ids[i]);
+            intents[i].setAction(Intent.ACTION_PASTE);
         }
+        getActivity().startActivities(intents);
+    }
+
+    // end multi-choice-mode listener callback handlers.
+
+    private void exportToQif(){
+        AllDataAdapter adapter = (AllDataAdapter) getListAdapter();
+        QifExport qif = new QifExport(getActivity());
+        qif.export(adapter);
+    }
+
+    private int[] convertArrayListToArray(ArrayList<Integer> list) {
+        int[] result = new int[list.size()];
+        for (int i = 0; i < list.size(); i++) {
+            result[i] = list.get(i);
+        }
+        return result;
+    }
+
+    /**
+     * Returns the latest-set arguments. This is because the original arguments, when the
+     * fragment was created, can not be altered.
+     * But, when an account changes, we need to modify them. The new arguments are passed
+     * through the call to loadData().
+     * @return
+     */
+    private Bundle getLatestArguments() {
+        if (mArguments == null) {
+            mArguments = getArguments();
+        }
+        return mArguments;
+    }
+
+    private void setLatestArguments(Bundle arguments) {
+        mArguments = arguments;
     }
 }

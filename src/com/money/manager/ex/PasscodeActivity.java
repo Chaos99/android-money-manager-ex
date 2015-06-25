@@ -1,24 +1,25 @@
-/*******************************************************************************
- * Copyright (C) 2012 The Android Money Manager Ex Project
- * 
+/*
+ * Copyright (C) 2012-2015 The Android Money Manager Ex Project Team
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ******************************************************************************/
+ */
 package com.money.manager.ex;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.support.v4.app.FragmentActivity;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
@@ -27,11 +28,11 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.TextView;
 
-import com.actionbarsherlock.app.SherlockActivity;
+
 import com.money.manager.ex.core.Core;
 import com.money.manager.ex.fragment.BaseListFragment;
 
-public class PasscodeActivity extends SherlockActivity {
+public class PasscodeActivity extends FragmentActivity {
 	public static final String INTENT_REQUEST_PASSWORD = "com.money.manager.ex.custom.intent.action.REQUEST_PASSWORD";
 	public static final String INTENT_MESSAGE_TEXT = "INTENT_MESSAGE_TEXT";
 	public static final String INTENT_RESULT_PASSCODE = "INTENT_RESULT_PASSCODE";
@@ -47,6 +48,7 @@ public class PasscodeActivity extends SherlockActivity {
 		}
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.passcode_activity);
+
 		// create a listener for button
 		OnClickListener clickListener = new OnClickListener() {
 			@Override

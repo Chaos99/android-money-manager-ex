@@ -1,3 +1,21 @@
+/*
+ * Copyright (C) 2012-2015 The Android Money Manager Ex Project Team
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ */
+
 package com.money.manager.ex.fragment;
 
 import android.os.Bundle;
@@ -19,6 +37,8 @@ import android.widget.ListAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
 
+import com.money.manager.ex.R;
+
 /**
  * This class has originally been taken from
  * http://stackoverflow.com/questions/6051050/expandablelistfragment-with-loadermanager-for-compatibility-package
@@ -27,7 +47,8 @@ import android.widget.TextView;
  *
  * All ASLv2 licensed.
  */
-public class ExpandableListFragment extends Fragment
+public class ExpandableListFragment
+        extends Fragment
         implements OnCreateContextMenuListener, ExpandableListView.OnChildClickListener,
         ExpandableListView.OnGroupCollapseListener, ExpandableListView.OnGroupExpandListener {
 
@@ -76,31 +97,33 @@ public class ExpandableListFragment extends Fragment
      */
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        FrameLayout root = new FrameLayout(getActivity());
+        return inflater.inflate(R.layout.expandable_list_fragment, container, false);
 
-        FrameLayout lframe = new FrameLayout(getActivity());
-        lframe.setId(INTERNAL_LIST_CONTAINER_ID);
-
-        TextView tv = new TextView(getActivity());
-        tv.setId(INTERNAL_EMPTY_ID);
-        tv.setGravity(Gravity.CENTER);
-        lframe.addView(tv,
-                new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-
-        ExpandableListView lv = new ExpandableListView(getActivity());
-        lv.setId(android.R.id.list);
-        lv.setDrawSelectorOnTop(false);
-        lframe.addView(lv,
-                new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-
-        root.addView(lframe, new FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-
-        ListView.LayoutParams lp =
-                new ListView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
-        root.setLayoutParams(lp);
-
-        return root;
+//        FrameLayout root = new FrameLayout(getActivity());
+//
+//        FrameLayout lframe = new FrameLayout(getActivity());
+//        lframe.setId(INTERNAL_LIST_CONTAINER_ID);
+//
+//        TextView tv = new TextView(getActivity());
+//        tv.setId(INTERNAL_EMPTY_ID);
+//        tv.setGravity(Gravity.CENTER);
+//        lframe.addView(tv,
+//                new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+//
+//        ExpandableListView lv = new ExpandableListView(getActivity());
+//        lv.setId(android.R.id.list);
+//        lv.setDrawSelectorOnTop(false);
+//        lframe.addView(lv,
+//                new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+//
+//        root.addView(lframe, new FrameLayout.LayoutParams(
+//                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+//
+//        ListView.LayoutParams lp =
+//                new ListView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+//        root.setLayoutParams(lp);
+//
+//        return root;
     }
 
     /**
@@ -259,11 +282,13 @@ public class ExpandableListFragment extends Fragment
         if (root instanceof ExpandableListView) {
             mList = (ExpandableListView) root;
         } else {
-            mStandardEmptyView = (TextView) root.findViewById(INTERNAL_EMPTY_ID);
+//            mStandardEmptyView = (TextView) root.findViewById(INTERNAL_EMPTY_ID);
+            mStandardEmptyView = (TextView) root.findViewById(R.id.empty);
             if (mStandardEmptyView == null) {
                 mEmptyView = root.findViewById(android.R.id.empty);
             }
-            mListContainer = root.findViewById(INTERNAL_LIST_CONTAINER_ID);
+//            mListContainer = root.findViewById(INTERNAL_LIST_CONTAINER_ID);
+            mListContainer = root.findViewById(R.id.container);
             View rawListView = root.findViewById(android.R.id.list);
             if (!(rawListView instanceof ExpandableListView)) {
                 if (rawListView == null) {

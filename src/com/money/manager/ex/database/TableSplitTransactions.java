@@ -1,20 +1,20 @@
-/*******************************************************************************
- * Copyright (C) 2012 The Android Money Manager Ex Project
- * 
+/*
+ * Copyright (C) 2012-2015 The Android Money Manager Ex Project Team
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ******************************************************************************/
+ */
 package com.money.manager.ex.database;
 
 import android.database.Cursor;
@@ -22,9 +22,12 @@ import android.os.Parcel;
 import android.os.Parcelable;
 
 import com.money.manager.ex.core.DatabaseField;
+import com.money.manager.ex.interfaces.ISplitTransactionsDataset;
 
-public class TableSplitTransactions extends Dataset implements Parcelable {
-	// FIELDS NAME
+public class TableSplitTransactions extends Dataset
+        implements Parcelable, ISplitTransactionsDataset {
+
+	// FIELD NAMES
 	public static final String SPLITTRANSID = "SPLITTRANSID";
 	public static final String TRANSID = "TRANSID";
 	public static final String CATEGID = "CATEGID";
@@ -44,9 +47,11 @@ public class TableSplitTransactions extends Dataset implements Parcelable {
 	
 	// CONSTRUCTOR
 	public TableSplitTransactions() {
-		super("SPLITTRANSACTIONS_V1", DatasetType.TABLE, "splittransaction");
+		super(TABLE_NAME, DatasetType.TABLE, "splittransaction");
 	}
-	
+
+	public static String TABLE_NAME = "SPLITTRANSACTIONS_V1";
+
 	@Override
 	public String[] getAllColumns() {
 		return new String[] {"SPLITTRANSID AS _id", SPLITTRANSID, TRANSID, CATEGID,
@@ -95,12 +100,12 @@ public class TableSplitTransactions extends Dataset implements Parcelable {
 		this.categId = categId;
 	}
 
-	/**
-	 * @param splitTransAmount the splitTransAmount to set
-	 */
-	public void setSplitTransAmount(double splitTransAmount) {
-		this.splitTransAmount = splitTransAmount;
-	}
+    /**
+     * @param splitTransAmount the splitTransAmount to set
+     */
+    public void setSplitTransAmount(double splitTransAmount) {
+        this.splitTransAmount = splitTransAmount;
+    }
 
 	/**
 	 * @param splitTransId the splitTransId to set

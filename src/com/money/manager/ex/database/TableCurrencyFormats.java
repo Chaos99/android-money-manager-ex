@@ -1,27 +1,27 @@
-/*******************************************************************************
- * Copyright (C) 2012 The Android Money Manager Ex Project
- * 
+/*
+ * Copyright (C) 2012-2015 The Android Money Manager Ex Project Team
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ******************************************************************************/
+ */
 package com.money.manager.ex.database;
-
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
 
 import android.database.Cursor;
 import android.text.TextUtils;
+
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 /**
  * 
  * @author Alessandro Lazzari (lazzari.ale@gmail.com)
@@ -41,6 +41,7 @@ public class TableCurrencyFormats extends Dataset {
 	public static final String SCALE = "SCALE";
 	public static final String BASECONVRATE = "BASECONVRATE";
 	public static final String CURRENCY_SYMBOL = "CURRENCY_SYMBOL";
+
 	// class member
 	private int currencyId;
 	private String currencyName;
@@ -201,12 +202,13 @@ public class TableCurrencyFormats extends Dataset {
 	public void setCurrencySymbol(String currencySymbol) {
 		this.currencySymbol = currencySymbol;
 	}
+
 	@Override
 	public void setValueFromCursor(Cursor c) {
 		if (c == null) { return; }
 		// check number of columns
 		if (!(c.getColumnCount() == this.getAllColumns().length)) { return; }
-		// set value of istance
+		// set value of instance
 		this.setCurrencyId(c.getInt(c.getColumnIndex(CURRENCYID)));
 		this.setCurrencyName(c.getString(c.getColumnIndex(CURRENCYNAME)));
 		this.setPfxSymbol(c.getString(c.getColumnIndex(PFX_SYMBOL)));
@@ -252,11 +254,11 @@ public class TableCurrencyFormats extends Dataset {
 
 		String ret = formatter.format(value);
 		// check suffix
-		if ((showSymbols) && (TextUtils.isEmpty(this.getSfxSymbol()) == false)) {
+		if ((showSymbols) && (!TextUtils.isEmpty(this.getSfxSymbol()))) {
 			ret = ret + " " + this.getSfxSymbol();
 		}
 		// check prefix
-		if (((showSymbols) && TextUtils.isEmpty(this.getPfxSymbol()) == false)) {
+		if (((showSymbols) && !TextUtils.isEmpty(this.getPfxSymbol()))) {
 			ret = this.getPfxSymbol() + " " + ret;
 		}
 		

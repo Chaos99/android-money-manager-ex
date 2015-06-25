@@ -1,20 +1,20 @@
-/*******************************************************************************
- * Copyright (C) 2012 The Android Money Manager Ex Project
- * 
+/*
+ * Copyright (C) 2012-2015 The Android Money Manager Ex Project Team
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- ******************************************************************************/
+ */
 package com.money.manager.ex.database;
 
 import android.database.Cursor;
@@ -33,7 +33,8 @@ public class TableAccountList extends Dataset {
 	public static final String ACCESSINFO = "ACCESSINFO"; 
 	public static final String INITIALBAL = "INITIALBAL";
 	public static final String FAVORITEACCT = "FAVORITEACCT";
-	public static final String CURRENCYID = "CURRENCYID"; 
+	public static final String CURRENCYID = "CURRENCYID";
+
 	// definizione dei campi
 	private int accountId;
 	private String accountName;
@@ -52,12 +53,14 @@ public class TableAccountList extends Dataset {
 	public TableAccountList() {
 		super("accountlist_v1", DatasetType.TABLE, "accountlist");
 	}
-	@Override
+
+    @Override
 	public String[] getAllColumns() {
 		return new String[] { "ACCOUNTID AS _id", ACCOUNTID, ACCOUNTNAME,
 				ACCOUNTTYPE, ACCOUNTNUM, STATUS, NOTES, HELDAT, WEBSITE,
 				CONTACTINFO, ACCESSINFO, INITIALBAL, FAVORITEACCT, CURRENCYID };
 	}
+
 	@Override
 	public void setValueFromCursor(Cursor c) {
 		// controllo che non sia null il cursore
@@ -79,6 +82,7 @@ public class TableAccountList extends Dataset {
 		this.setFavoriteAcct(c.getString(c.getColumnIndex(FAVORITEACCT)));
 		this.setCurrencyId(c.getInt(c.getColumnIndex(CURRENCYID)));
 	}
+
 	/**
 	 * @return the accountId
 	 */
